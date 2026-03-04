@@ -3,16 +3,16 @@
 <head>
     <meta name="figmin">
     <style>
-        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 15px; width: 260px; }
-        .btn-main { width: 100%; padding: 15px; font-size: 16px; background: #00d1b2; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; }
-        .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 15px; width: 260px; border: 2px solid #00d1b2; }
+        .btn-main { width: 100%; padding: 15px; font-size: 16px; background: #00d1b2; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; color: black; }
+        .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
         .controls { display: flex; align-items: center; gap: 8px; }
         .btn-sm { width: 35px; height: 35px; font-size: 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .val { min-width: 50px; font-family: monospace; color: #00d1b2; font-size: 14px; }
+        .val { min-width: 50px; font-family: monospace; color: #00d1b2; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h3>Mesa ONCE XR</h3>
+    <h3 style="margin-top:0">Panel Mesa ONCE</h3>
     <button id="btnMover" class="btn-main">SUBIR / BAJAR</button>
     
     <div class="row"><span>X</span><div class="controls"><button id="mx">-</button><span id="tx">0.00</span><button id="px">+</button></div></div>
@@ -25,60 +25,65 @@
         const DIST_MAX = 0.5, VEL = 0.3;
 
         document.addEventListener("FigminReady", () => {
-            // CARGA DE MODELOS (URL completa para asegurar descarga)
+            // FORZAMOS ESCALA 1 AL IMPORTAR
+            const escalaInicial = { x: 1, y: 1, z: 1 };
+            const spawnPos = figmin.getWindowSpawnPosition();
+
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
-                position: figmin.getWindowSpawnPosition()
+                position: spawnPos,
+                scale: escalaInicial // <--- ESCALA 1:1 FORZADA
             });
 
             tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
-                position: figmin.getWindowSpawnPosition()
+                position: spawnPos,
+                scale: escalaInicial // <--- ESCALA 1:1 FORZADA
             });
 
-            // BOTÓN PRINCIPAL
-            document.getElementById("btnMover").onclick = () => { subiendo = !subiendo; };
+            // Desactivar física para evitar que se caigan o se bloqueen
+            tablero.onStart(() => { if(tablero.physics) tablero.physics.enabled = false; });
+            base.onStart(() => { if(base.physics) base.physics.enabled = false; });
 
-            // BOTONES DE OFFSET (Asignación directa para evitar errores)
-            document.getElementById("px").onclick = () => { ox += 0.01; updateLabels(); };
-            document.getElementById("mx").onclick = () => { ox -= 0.01; updateLabels(); };
-            document.getElementById("py").onclick = () => { oy += 0.01; updateLabels(); };
-            document.getElementById("my").onclick = () => { oy -= 0.01; updateLabels(); };
-            document.getElementById("pz").onclick = () => { oz += 0.01; updateLabels(); };
-            document.getElementById("mz").onclick = () => { oz -= 0.01; updateLabels(); };
+            // ASIGNACIÓN DE BOTONES
+            document.getElementById("btnMover").onclick = () => { subiendo = !subiendo; };
+            document.getElementById("px").onclick = () => { ox += 0.01; updateUI(); };
+            document.getElementById("mx").onclick = () => { ox -= 0.01; updateUI(); };
+            document.getElementById("py").onclick = () => { oy += 0.01; updateUI(); };
+            document.getElementById("my").onclick = () => { oy -= 0.01; updateUI(); };
+            document.getElementById("pz").onclick = () => { oz += 0.01; updateUI(); };
+            document.getElementById("mz").onclick = () => { oz -= 0.01; updateUI(); };
 
             figmin.setUpdateFunction(update);
         });
 
-        function updateLabels() {
+        function updateUI() {
             document.getElementById("tx").innerText = ox.toFixed(2);
             document.getElementById("ty").innerText = oy.toFixed(2);
             document.getElementById("tz").innerText = oz.toFixed(2);
         }
 
         function update(dt) {
-            // VERIFICACIÓN DE SEGURIDAD (Si esto falla, el tablero se queda en el 0)
             if (!base || !base.transform || !tablero || !tablero.transform) return;
 
-            // 1. Animación de subida
+            // 1. Animación de altura
             if (subiendo && alturaY < DIST_MAX) { alturaY += VEL * dt; }
             else if (!subiendo && alturaY > 0) { alturaY -= VEL * dt; }
 
-            // 2. REFERENCIA MAESTRA (La base manda)
-            const bPos = base.transform.position;
-            const bRot = base.transform.rotation;
-            const bScale = base.transform.scale;
+            const b = base.transform;
+            const t = tablero.transform;
 
-            // 3. SINCRONIZACIÓN TOTAL (Tablero copia a la base)
-            tablero.transform.rotation = { x: bRot.x, y: bRot.y, z: bRot.z };
-            tablero.transform.scale = { x: bScale.x, y: bScale.y, z: bScale.z };
+            // 2. SINCRONIZACIÓN DE TRANSFORMACIONES
+            // El tablero copia escala y rotación de la base en cada frame
+            t.scale = { x: b.scale.x, y: b.scale.y, z: b.scale.z };
+            t.rotation = { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z };
 
-            // 4. POSICIÓN (Base + Offset manual + Animación de altura)
-            // Multiplicamos por la escala para que si agrandas la mesa, el hueco no se rompa
-            tablero.transform.position = {
-                x: bPos.x + (ox * bScale.x),
-                y: bPos.y + ((alturaY + oy) * bScale.y),
-                z: bPos.z + (oz * bScale.z)
+            // 3. POSICIÓN FINAL
+            // El tablero sigue a la base y aplica el movimiento local
+            t.position = {
+                x: b.position.x + (ox * b.scale.x),
+                y: b.position.y + ((alturaY + oy) * b.scale.y),
+                z: b.position.z + (oz * b.scale.z)
             };
         }
     </script>
