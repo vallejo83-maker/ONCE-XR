@@ -5,13 +5,13 @@
     <style>
         body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 250px; }
         button { padding: 15px; font-size: 16px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 8px; width: 100%; font-weight: bold; }
-        #status { margin-top: 10px; font-size: 11px; color: #aaa; white-space: pre-wrap; }
+        #status { margin-top: 10px; font-size: 11px; color: #aaa; }
     </style>
 </head>
 <body>
     <h3>Mesa ONCE XR</h3>
     <button id="btnMover">SUBIR / BAJAR</button>
-    <div id="status">Iniciando sistema...</div>
+    <div id="status">Esperando a Figmin XR...</div>
 
     <script>
         let base = null;
@@ -23,63 +23,52 @@
         const VELOCIDAD = 0.3;
         const statusText = document.getElementById("status");
 
-        function log(msg) {
-            statusText.innerText = msg;
-            console.log(msg);
-        }
+        // Esta es la función que hace que Figmin empiece a trabajar
+        document.addEventListener("FigminReady", function() {
+            statusText.innerText = "Figmin detectado. Cargando...";
 
-        document.addEventListener("FigminReady", () => {
-            log("Cargando Base...");
-
-            // 1. Cargamos la Base
+            // 1. Crear Base
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: figmin.getWindowSpawnPosition()
             });
 
-            // Si la base da error
-            base.onError((err) => log("Error en Base: " + err));
-
-            // Cuando la base esté lista
-            base.onStart(() => {
-                log("Base lista.\nCargando Tablero...");
+            // 2. Cuando la base cargue, crear tablero
+            base.onStart(function() {
+                statusText.innerText = "Base lista. Cargando tablero...";
                 
-                // 2. Cargamos el Tablero
-                // He quitado el 'parent' momentáneamente para descartar que sea el problema
                 tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                     url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
-                    position: base.transform.position // Lo ponemos en el mismo sitio que la base
+                    parent: base,
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
                 });
 
-                tablero.onStart(() => {
-                    log("Mesa completa.\nVinculando piezas...");
-                    // Una vez cargado, lo hacemos hijo de la base
-                    tablero.parent = base;
-                    tablero.transform.position = { x: 0, y: 0, z: 0 };
-                    tablero.transform.rotation = { x: 0, y: 0, z: 0 };
-                    log("¡Todo listo!");
+                tablero.onStart(function() {
+                    statusText.innerText = "¡Mesa lista!";
                 });
-
-                tablero.onError((err) => log("Error en Tablero: " + err));
             });
 
-            document.getElementById("btnMover").onclick = () => {
+            // Configurar botón
+            document.getElementById("btnMover").onclick = function() {
                 subiendo = !subiendo;
-                log(subiendo ? "Subiendo..." : "Bajando...");
+                statusText.innerText = subiendo ? "Subiendo..." : "Bajando...";
             };
 
+            // Iniciar bucle de movimiento
             figmin.setUpdateFunction(update);
         });
 
         function update(dt) {
-            // Solo movemos si el tablero existe y TIENE UN PADRE (la base)
-            if (tablero && tablero.parent && tablero.transform) {
+            // Solo movemos si el tablero está listo
+            if (tablero && tablero.transform) {
                 if (subiendo && alturaY < DISTANCIA_MAX) {
                     alturaY += VELOCIDAD * dt;
                 } else if (!subiendo && alturaY > 0) {
                     alturaY -= VELOCIDAD * dt;
                 }
-
+                
+                // Aplicar altura
                 tablero.transform.position = { x: 0, y: alturaY, z: 0 };
             }
         }
