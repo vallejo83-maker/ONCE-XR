@@ -91,6 +91,10 @@
             const escalaInicial = { x: 1, y: 1, z: 1 };
             const spawnPos = figmin.getWindowSpawnPosition();
 
+            // anchorPos: la posición real de spawn. NO leer de transform.position
+            // porque Figmin devuelve {0,0,0} incluso aunque el objeto se vea en spawnPos.
+            anchorPos = { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z };
+
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: spawnPos,
@@ -103,16 +107,8 @@
                 scale: escalaInicial
             });
 
-            // onStart: capturamos la posición REAL de la base una vez que está colocada en el mundo
             base.onStart(() => {
                 if (base.physics) base.physics.enabled = false;
-                // Guardamos la posición real del objeto tras su colocación en la escena
-                anchorPos = {
-                    x: base.transform.position.x,
-                    y: base.transform.position.y,
-                    z: base.transform.position.z
-                };
-                figmin.print("Base lista en: " + JSON.stringify(anchorPos));
                 baseReady = true;
             });
 
