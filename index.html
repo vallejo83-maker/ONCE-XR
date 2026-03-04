@@ -16,12 +16,12 @@
 
         document.addEventListener("FigminReady", () => {
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
-                url: "base.glb",
+                url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: figmin.getWindowSpawnPosition()
             });
             base.onStart(() => {
                 tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
-                    url: "tablero.glb",
+                    url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
                     parent: base,
                     position: { x: 0, y: 0, z: 0 }
                 });
