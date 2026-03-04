@@ -8,31 +8,30 @@
             font-family: sans-serif;
             text-align: center;
             color: white;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
             border-radius: 15px;
-            width: 260px;
-            border: 2px solid #00d1b2;
+            width: 250px;
         }
 
-        .btn-main {
-            width: 100%;
+        button {
             padding: 15px;
             font-size: 16px;
+            cursor: pointer;
             background: #00d1b2;
+            color: white;
             border: none;
             border-radius: 8px;
+            width: 100%;
             font-weight: bold;
-            margin-bottom: 15px;
-            cursor: pointer;
-            color: black;
+            margin-bottom: 8px;
         }
 
         .row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             border-bottom: 1px solid #333;
             padding-bottom: 5px;
         }
@@ -46,7 +45,7 @@
         .btn-sm {
             width: 35px;
             height: 35px;
-            font-size: 20px;
+            font-size: 18px;
             background: #444;
             color: white;
             border: none;
@@ -55,24 +54,30 @@
         }
 
         .val {
-            min-width: 50px;
+            min-width: 45px;
             font-family: monospace;
             color: #00d1b2;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
         }
 
         #status {
-            margin-top: 10px;
+            margin-top: 8px;
             font-size: 11px;
             color: #aaa;
+        }
+
+        #version {
+            font-size: 10px;
+            color: #555;
+            margin-top: 4px;
         }
     </style>
 </head>
 
 <body>
-    <h3 style="margin-top:0">Panel Mesa ONCE</h3>
-    <button id="btnMover" class="btn-main">SUBIR / BAJAR</button>
+    <h3 style="margin-top:0">Mesa ONCE XR</h3>
+    <button id="btnMover">SUBIR / BAJAR</button>
 
     <div class="row">
         <span>X</span>
@@ -100,6 +105,7 @@
     </div>
 
     <div id="status">Iniciando...</div>
+    <div id="version">v1</div>
 
     <script>
         let base = null;
@@ -115,17 +121,16 @@
         document.addEventListener("FigminReady", function () {
             statusText.innerText = "Cargando Base...";
 
-            // 1. Crear la base
+            // 1. Crear Base
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: figmin.getWindowSpawnPosition()
             });
 
-            // 2. Crear el tablero DENTRO de base.onStart
-            //    → base.transform.position tiene aquí el valor real y correcto
             base.onStart(function () {
                 statusText.innerText = "Cargando Tablero...";
 
+                // 2. Crear Tablero en la misma posición que la base
                 tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                     url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
                     position: base.transform.position
@@ -136,13 +141,11 @@
                 });
             });
 
-            // Botón SUBIR / BAJAR
             document.getElementById("btnMover").onclick = function () {
                 subiendo = !subiendo;
-                statusText.innerText = subiendo ? "↑ Subiendo..." : "↓ Bajando...";
+                statusText.innerText = subiendo ? "Subiendo..." : "Bajando...";
             };
 
-            // Controles de offset X / Y / Z
             document.getElementById("px").onclick = function () { ox += 0.01; updateUI(); };
             document.getElementById("mx").onclick = function () { ox -= 0.01; updateUI(); };
             document.getElementById("py").onclick = function () { oy += 0.01; updateUI(); };
@@ -162,26 +165,22 @@
         function update(dt) {
             if (base && base.transform && tablero && tablero.transform) {
 
-                // Animación de altura
                 if (subiendo && alturaY < DISTANCIA_MAX) {
-                    alturaY = Math.min(alturaY + VELOCIDAD * dt, DISTANCIA_MAX);
+                    alturaY += VELOCIDAD * dt;
                 } else if (!subiendo && alturaY > 0) {
-                    alturaY = Math.max(alturaY - VELOCIDAD * dt, 0);
+                    alturaY -= VELOCIDAD * dt;
                 }
 
-                // Leer posición/rotación/escala actuales de la base
                 let bPos = base.transform.position;
                 let bRot = base.transform.rotation;
-                let bSc = base.transform.scale;
 
-                // El tablero sigue a la base + offsets manuales + elevación animada
-                tablero.transform.rotation = { x: bRot.x, y: bRot.y, z: bRot.z };
-                tablero.transform.scale = { x: bSc.x, y: bSc.y, z: bSc.z };
                 tablero.transform.position = {
-                    x: bPos.x + (ox * bSc.x),
-                    y: bPos.y + ((alturaY + oy) * bSc.y),
-                    z: bPos.z + (oz * bSc.z)
+                    x: bPos.x + ox,
+                    y: bPos.y + alturaY + oy,
+                    z: bPos.z + oz
                 };
+
+                tablero.transform.rotation = bRot;
             }
         }
     </script>
