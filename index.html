@@ -1,86 +1,190 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
+
 <head>
     <meta name="figmin">
     <style>
-        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 250px; }
-        button { padding: 15px; font-size: 16px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 8px; width: 100%; font-weight: bold; }
-        #status { margin-top: 10px; font-size: 11px; color: #aaa; }
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            color: white;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 15px;
+            width: 260px;
+            border: 2px solid #00d1b2;
+        }
+
+        .btn-main {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            background: #00d1b2;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            cursor: pointer;
+            color: black;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            width: 35px;
+            height: 35px;
+            font-size: 20px;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .val {
+            min-width: 50px;
+            font-family: monospace;
+            color: #00d1b2;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #aaa;
+        }
     </style>
 </head>
+
 <body>
-    <h3>Mesa ONCE XR</h3>
-    <button id="btnMover">SUBIR / BAJAR</button>
+    <h3 style="margin-top:0">Panel Mesa ONCE</h3>
+    <button id="btnMover" class="btn-main">SUBIR / BAJAR</button>
+
+    <div class="row">
+        <span>X</span>
+        <div class="controls">
+            <button id="mx" class="btn-sm">-</button>
+            <span id="tx" class="val">0.00</span>
+            <button id="px" class="btn-sm">+</button>
+        </div>
+    </div>
+    <div class="row">
+        <span>Y</span>
+        <div class="controls">
+            <button id="my" class="btn-sm">-</button>
+            <span id="ty" class="val">0.00</span>
+            <button id="py" class="btn-sm">+</button>
+        </div>
+    </div>
+    <div class="row">
+        <span>Z</span>
+        <div class="controls">
+            <button id="mz" class="btn-sm">-</button>
+            <span id="tz" class="val">0.00</span>
+            <button id="pz" class="btn-sm">+</button>
+        </div>
+    </div>
+
     <div id="status">Iniciando...</div>
 
     <script>
         let base = null;
         let tablero = null;
         let subiendo = false;
-        let alturaY = 0; // Desplazamiento vertical respecto a la base
-        
-        const DISTANCIA_MAX = 0.5; 
+        let alturaY = 0;
+        let ox = 0, oy = 0, oz = 0;
+
+        const DISTANCIA_MAX = 0.5;
         const VELOCIDAD = 0.3;
         const statusText = document.getElementById("status");
 
-        document.addEventListener("FigminReady", function() {
+        document.addEventListener("FigminReady", function () {
             statusText.innerText = "Cargando Base...";
 
-            // 1. Crear Base
+            // 1. Crear la base
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: figmin.getWindowSpawnPosition()
             });
 
-            base.onStart(function() {
+            // 2. Crear el tablero DENTRO de base.onStart
+            //    → base.transform.position tiene aquí el valor real y correcto
+            base.onStart(function () {
                 statusText.innerText = "Cargando Tablero...";
-                
-                // 2. Crear Tablero (Lo creamos en la misma posición que la base)
+
                 tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                     url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
                     position: base.transform.position
                 });
 
-                tablero.onStart(function() {
+                tablero.onStart(function () {
                     statusText.innerText = "¡Mesa sincronizada!";
                 });
             });
 
-            document.getElementById("btnMover").onclick = function() {
+            // Botón SUBIR / BAJAR
+            document.getElementById("btnMover").onclick = function () {
                 subiendo = !subiendo;
-                statusText.innerText = subiendo ? "Subiendo..." : "Bajando...";
+                statusText.innerText = subiendo ? "↑ Subiendo..." : "↓ Bajando...";
             };
+
+            // Controles de offset X / Y / Z
+            document.getElementById("px").onclick = function () { ox += 0.01; updateUI(); };
+            document.getElementById("mx").onclick = function () { ox -= 0.01; updateUI(); };
+            document.getElementById("py").onclick = function () { oy += 0.01; updateUI(); };
+            document.getElementById("my").onclick = function () { oy -= 0.01; updateUI(); };
+            document.getElementById("pz").onclick = function () { oz += 0.01; updateUI(); };
+            document.getElementById("mz").onclick = function () { oz -= 0.01; updateUI(); };
 
             figmin.setUpdateFunction(update);
         });
 
+        function updateUI() {
+            document.getElementById("tx").innerText = ox.toFixed(2);
+            document.getElementById("ty").innerText = oy.toFixed(2);
+            document.getElementById("tz").innerText = oz.toFixed(2);
+        }
+
         function update(dt) {
-            // Si ambos existen, forzamos que el tablero siga a la base
             if (base && base.transform && tablero && tablero.transform) {
-                
-                // A. Calculamos la elevación (0 a DISTANCIA_MAX)
+
+                // Animación de altura
                 if (subiendo && alturaY < DISTANCIA_MAX) {
-                    alturaY += VELOCIDAD * dt;
+                    alturaY = Math.min(alturaY + VELOCIDAD * dt, DISTANCIA_MAX);
                 } else if (!subiendo && alturaY > 0) {
-                    alturaY -= VELOCIDAD * dt;
+                    alturaY = Math.max(alturaY - VELOCIDAD * dt, 0);
                 }
 
-                // B. SINCRONIZACIÓN MANUAL (Plan B)
-                // Obtenemos la posición de la base en el mundo real
+                // Leer posición/rotación/escala actuales de la base
                 let bPos = base.transform.position;
                 let bRot = base.transform.rotation;
+                let bSc = base.transform.scale;
 
-                // El tablero copia la posición de la base, pero le sumamos la alturaY
-                tablero.transform.position = { 
-                    x: bPos.x, 
-                    y: bPos.y + alturaY, 
-                    z: bPos.z 
+                // El tablero sigue a la base + offsets manuales + elevación animada
+                tablero.transform.rotation = { x: bRot.x, y: bRot.y, z: bRot.z };
+                tablero.transform.scale = { x: bSc.x, y: bSc.y, z: bSc.z };
+                tablero.transform.position = {
+                    x: bPos.x + (ox * bSc.x),
+                    y: bPos.y + ((alturaY + oy) * bSc.y),
+                    z: bPos.z + (oz * bSc.z)
                 };
-
-                // El tablero copia la rotación de la base para que no se gire solo
-                tablero.transform.rotation = bRot;
             }
         }
     </script>
 </body>
+
 </html>
