@@ -3,25 +3,27 @@
 <head>
     <meta name="figmin">
     <style>
-        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 250px; }
-        button { padding: 15px; font-size: 16px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 8px; width: 100%; font-weight: bold; }
-        #status { margin-top: 10px; font-size: 11px; color: #aaa; }
+        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 12px; width: 220px; }
+        button { padding: 12px; font-size: 15px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 8px; width: 100%; font-weight: bold; }
+        #info { margin-top: 10px; font-size: 10px; color: #00d1b2; }
     </style>
 </head>
 <body>
     <h3>Mesa ONCE XR</h3>
     <button id="btnMover">SUBIR / BAJAR</button>
-    <div id="status">Sincronizando...</div>
+    <div id="info">Sincronizando modelos...</div>
 
     <script>
         let base = null;
         let tablero = null;
         let subiendo = false;
         let alturaY = 0; 
-        
-        const DISTANCIA_MAX = 0.5; 
-        const VELOCIDAD = 0.3;
-        const statusText = document.getElementById("status");
+
+        // --- AJUSTES MANUALES ---
+        const DISTANCIA_MAX = 0.5; // Metros que sube
+        const VELOCIDAD = 0.3;     // Velocidad de subida
+        const OFFSET_INICIAL_Y = 0; // Cambia esto (ej: 0.1 o -0.1) si el tablero no encaja al inicio
+        // ------------------------
 
         document.addEventListener("FigminReady", function() {
             // 1. Crear Base
@@ -30,16 +32,10 @@
                 position: figmin.getWindowSpawnPosition()
             });
 
-            base.onStart(function() {
-                // 2. Crear Tablero
-                tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
-                    url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
-                    position: base.transform.position
-                });
-
-                tablero.onStart(function() {
-                    statusText.innerText = "¡Sincronización Total Activa!";
-                });
+            // 2. Crear Tablero
+            tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
+                url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
+                position: figmin.getWindowSpawnPosition()
             });
 
             document.getElementById("btnMover").onclick = function() {
@@ -50,35 +46,38 @@
         });
 
         function update(dt) {
+            // Comprobamos que ambos objetos tengan sus datos listos
             if (base && base.transform && tablero && tablero.transform) {
                 
-                // 1. Lógica de altura
+                document.getElementById("info").innerText = "Sincronización 1:1 Activa";
+
+                // 1. Calcular altura de la animación
                 if (subiendo && alturaY < DISTANCIA_MAX) {
                     alturaY += VELOCIDAD * dt;
                 } else if (!subiendo && alturaY > 0) {
                     alturaY -= VELOCIDAD * dt;
                 }
 
-                // 2. OBTENER DATOS DE LA BASE
-                let bPos = base.transform.position;
-                let bRot = base.transform.rotation;
-                let bScale = base.transform.scale;
+                // 2. LEER DATOS DE LA BASE (El objeto maestro)
+                const bPos = base.transform.position;
+                const bRot = base.transform.rotation;
+                const bScale = base.transform.scale;
 
-                // 3. SINCRONIZAR ESCALA
-                // El tablero siempre tendrá el mismo tamaño que la base
+                // 3. FORZAR TABLERO A SEGUIR A LA BASE
+                // Sincronizamos ESCALA (si agrandas la base, el tablero crece igual)
                 tablero.transform.scale = { x: bScale.x, y: bScale.y, z: bScale.z };
 
-                // 4. SINCRONIZAR POSICIÓN (Ajustada por escala)
-                // Multiplicamos alturaY por la escala Y de la base para que el 
-                // movimiento sea proporcional si agrandas la mesa.
+                // Sincronizamos ROTACIÓN (si giras la base, el tablero gira igual)
+                tablero.transform.rotation = { x: bRot.x, y: bRot.y, z: bRot.z };
+
+                // Sincronizamos POSICIÓN
+                // Aplicamos la altura sumada a la posición de la base, 
+                // multiplicada por la escala para que no se desplace mal.
                 tablero.transform.position = { 
                     x: bPos.x, 
-                    y: bPos.y + (alturaY * bScale.y), 
+                    y: bPos.y + ((alturaY + OFFSET_INICIAL_Y) * bScale.y), 
                     z: bPos.z 
                 };
-
-                // 5. SINCRONIZAR ROTACIÓN
-                tablero.transform.rotation = { x: bRot.x, y: bRot.y, z: bRot.z };
             }
         }
     </script>
