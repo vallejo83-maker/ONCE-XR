@@ -61,6 +61,12 @@
             font-size: 14px;
             font-weight: bold;
         }
+
+        #status {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #aaa;
+        }
     </style>
 </head>
 
@@ -68,63 +74,83 @@
     <h3 style="margin-top:0">Panel Mesa ONCE</h3>
     <button id="btnMover" class="btn-main">SUBIR / BAJAR</button>
 
-    <div class="row"><span>X</span>
-        <div class="controls"><button id="mx">-</button><span id="tx">0.00</span><button id="px">+</button></div>
+    <div class="row">
+        <span>X</span>
+        <div class="controls">
+            <button id="mx" class="btn-sm">-</button>
+            <span id="tx" class="val">0.00</span>
+            <button id="px" class="btn-sm">+</button>
+        </div>
     </div>
-    <div class="row"><span>Y</span>
-        <div class="controls"><button id="my">-</button><span id="ty">0.00</span><button id="py">+</button></div>
+    <div class="row">
+        <span>Y</span>
+        <div class="controls">
+            <button id="my" class="btn-sm">-</button>
+            <span id="ty" class="val">0.00</span>
+            <button id="py" class="btn-sm">+</button>
+        </div>
     </div>
-    <div class="row"><span>Z</span>
-        <div class="controls"><button id="mz">-</button><span id="tz">0.00</span><button id="pz">+</button></div>
+    <div class="row">
+        <span>Z</span>
+        <div class="controls">
+            <button id="mz" class="btn-sm">-</button>
+            <span id="tz" class="val">0.00</span>
+            <button id="pz" class="btn-sm">+</button>
+        </div>
     </div>
+
+    <div id="status">Iniciando...</div>
 
     <script>
-        let base = null, tablero = null, subiendo = false, alturaY = 0;
-        let ox = 0, oy = 0, oz = 0;
-        let baseReady = false, tableroReady = false;
-        // anchorPos: posición real de la base capturada en onStart (no en FigminReady)
-        // getWindowSpawnPosition() puede devolver {0,0,0} antes de que la ventana esté lista
-        let anchorPos = null;
-        const DIST_MAX = 0.5, VEL = 0.3;
+        let base = null;
+        let tablero = null;
+        let subiendo = false;
+        let alturaY = 0;   // elevación animada (0 → DIST_MAX)
+        let ox = 0, oy = 0, oz = 0;  // offsets manuales X/Y/Z
 
-        document.addEventListener("FigminReady", () => {
-            const escalaInicial = { x: 1, y: 1, z: 1 };
-            const spawnPos = figmin.getWindowSpawnPosition();
+        const DIST_MAX = 0.5;
+        const VELOCIDAD = 0.3;
+        const statusEl = document.getElementById("status");
 
-            // anchorPos: la posición real de spawn. NO leer de transform.position
-            // porque Figmin devuelve {0,0,0} incluso aunque el objeto se vea en spawnPos.
-            anchorPos = { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z };
+        document.addEventListener("FigminReady", function () {
+            statusEl.innerText = "Cargando base...";
 
+            // 1. Crear la base
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
-                position: spawnPos,
-                scale: escalaInicial
+                position: figmin.getWindowSpawnPosition()
             });
 
-            tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
-                url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
-                position: spawnPos,
-                scale: escalaInicial
-            });
-
-            base.onStart(() => {
+            // 2. Crear el tablero DENTRO de base.onStart
+            //    → aquí base.transform.position tiene el valor real y correcto
+            base.onStart(function () {
                 if (base.physics) base.physics.enabled = false;
-                baseReady = true;
+                statusEl.innerText = "Cargando tablero...";
+
+                tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
+                    url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
+                    position: base.transform.position   // ← misma posición real que la base
+                });
+
+                tablero.onStart(function () {
+                    if (tablero.physics) tablero.physics.enabled = false;
+                    statusEl.innerText = "¡Mesa lista!";
+                });
             });
 
-            tablero.onStart(() => {
-                if (tablero.physics) tablero.physics.enabled = false;
-                tableroReady = true;
-            });
+            // Botón SUBIR / BAJAR
+            document.getElementById("btnMover").onclick = function () {
+                subiendo = !subiendo;
+                statusEl.innerText = subiendo ? "↑ Subiendo..." : "↓ Bajando...";
+            };
 
-            // ASIGNACIÓN DE BOTONES
-            document.getElementById("btnMover").onclick = () => { subiendo = !subiendo; };
-            document.getElementById("px").onclick = () => { ox += 0.01; updateUI(); };
-            document.getElementById("mx").onclick = () => { ox -= 0.01; updateUI(); };
-            document.getElementById("py").onclick = () => { oy += 0.01; updateUI(); };
-            document.getElementById("my").onclick = () => { oy -= 0.01; updateUI(); };
-            document.getElementById("pz").onclick = () => { oz += 0.01; updateUI(); };
-            document.getElementById("mz").onclick = () => { oz -= 0.01; updateUI(); };
+            // Controles de offset X/Y/Z
+            document.getElementById("px").onclick = function () { ox += 0.01; updateUI(); };
+            document.getElementById("mx").onclick = function () { ox -= 0.01; updateUI(); };
+            document.getElementById("py").onclick = function () { oy += 0.01; updateUI(); };
+            document.getElementById("my").onclick = function () { oy -= 0.01; updateUI(); };
+            document.getElementById("pz").onclick = function () { oz += 0.01; updateUI(); };
+            document.getElementById("mz").onclick = function () { oz -= 0.01; updateUI(); };
 
             figmin.setUpdateFunction(update);
         });
@@ -136,26 +162,25 @@
         }
 
         function update(dt) {
-            // Esperar a que ambos objetos estén listos Y que anchorPos esté capturado
-            if (!baseReady || !tableroReady || !anchorPos) return;
+            // Esperar a que ambos objetos existan y tengan transform
+            if (!base || !base.transform || !tablero || !tablero.transform) return;
 
-            // 1. Animación de altura (con clamp)
-            if (subiendo && alturaY < DIST_MAX) { alturaY = Math.min(alturaY + VEL * dt, DIST_MAX); }
-            else if (!subiendo && alturaY > 0) { alturaY = Math.max(alturaY - VEL * dt, 0); }
+            // Animación de altura con clamp
+            if (subiendo && alturaY < DIST_MAX) { alturaY = Math.min(alturaY + VELOCIDAD * dt, DIST_MAX); }
+            else if (!subiendo && alturaY > 0) { alturaY = Math.max(alturaY - VELOCIDAD * dt, 0); }
 
-            // 2. Leer escala y rotación en vivo de la base (para seguir cambios del usuario)
-            const sc = base.transform.scale;
-            const rot = base.transform.rotation;
+            // Leer posición/rotación/escala actuales de la base
+            const bPos = base.transform.position;
+            const bRot = base.transform.rotation;
+            const bSc = base.transform.scale;
 
-            // 3. Sincronizar escala y rotación del tablero con la base
-            tablero.transform.scale = { x: sc.x, y: sc.y, z: sc.z };
-            tablero.transform.rotation = { x: rot.x, y: rot.y, z: rot.z };
-
-            // 4. Posición: anchorPos (fijo, capturado en onStart) + offsets escalados
+            // El tablero sigue a la base + offsets manuales + elevación animada
+            tablero.transform.rotation = { x: bRot.x, y: bRot.y, z: bRot.z };
+            tablero.transform.scale = { x: bSc.x, y: bSc.y, z: bSc.z };
             tablero.transform.position = {
-                x: anchorPos.x + (ox * sc.x),
-                y: anchorPos.y + ((alturaY + oy) * sc.y),
-                z: anchorPos.z + (oz * sc.z)
+                x: bPos.x + (ox * bSc.x),
+                y: bPos.y + ((alturaY + oy) * bSc.y),
+                z: bPos.z + (oz * bSc.z)
             };
         }
     </script>
