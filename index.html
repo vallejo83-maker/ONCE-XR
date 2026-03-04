@@ -4,39 +4,79 @@
     <meta name="figmin">
     <style>
         body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 250px; }
-        button { padding: 15px; font-size: 16px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 8px; width: 100%; }
+        button { padding: 15px; font-size: 16px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 8px; width: 100%; font-weight: bold; }
+        #status { margin-top: 10px; font-size: 11px; color: #aaa; }
     </style>
 </head>
 <body>
     <h3>Mesa ONCE XR</h3>
     <button id="btnMover">SUBIR / BAJAR</button>
+    <div id="status">Iniciando...</div>
+
     <script>
-        let base = null, tablero = null, subiendo = false, alturaY = 0;
-        const DISTANCIA_MAX = 0.5, VELOCIDAD = 0.3;
+        let base = null;
+        let tablero = null;
+        let subiendo = false;
+        let alturaY = 0;
+        
+        // Configuración
+        const DISTANCIA_MAX = 0.5; 
+        const VELOCIDAD = 0.3;
+        const statusText = document.getElementById("status");
 
         document.addEventListener("FigminReady", () => {
+            statusText.innerText = "Descargando Base...";
+
+            // 1. Cargar Base con URL completa
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: figmin.getWindowSpawnPosition()
             });
+
             base.onStart(() => {
+                statusText.innerText = "Descargando Tablero...";
+                
+                // 2. Cargar Tablero con URL completa y como hijo de Base
                 tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                     url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
                     parent: base,
-                    position: { x: 0, y: 0, z: 0 }
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 } // Forzamos rotación limpia
+                });
+
+                tablero.onStart(() => {
+                    statusText.innerText = "Mesa lista. Pulsa el botón.";
                 });
             });
-            document.getElementById("btnMover").onclick = () => { subiendo = !subiendo; };
+
+            // Acción del botón
+            document.getElementById("btnMover").onclick = () => {
+                subiendo = !subiendo;
+                statusText.innerText = subiendo ? "Subiendo..." : "Bajando...";
+            };
+
+            // Ejecutar el bucle de movimiento
             figmin.setUpdateFunction(update);
         });
 
         function update(dt) {
-            if (!tablero) return;
-            if (subiendo && alturaY < DISTANCIA_MAX) { alturaY += VELOCIDAD * dt; }
-            else if (!subiendo && alturaY > 0) { alturaY -= VELOCIDAD * dt; }
-            let pos = tablero.transform.position;
-            pos.y = alturaY;
-            tablero.transform.position = pos;
+            // Solo mover si el tablero está cargado y tiene transform
+            if (tablero && tablero.transform) {
+                
+                // Lógica de altura
+                if (subiendo && alturaY < DISTANCIA_MAX) {
+                    alturaY += VELOCIDAD * dt;
+                } else if (!subiendo && alturaY > 0) {
+                    alturaY -= VELOCIDAD * dt;
+                }
+
+                // Aplicar posición relativa al padre (Base)
+                tablero.transform.position = { 
+                    x: 0, 
+                    y: alturaY, 
+                    z: 0 
+                };
+            }
         }
     </script>
 </body>
