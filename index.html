@@ -3,118 +3,114 @@
 <head>
     <meta name="figmin">
     <style>
-        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 12px; width: 260px; }
-        button { padding: 10px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 5px; font-weight: bold; }
-        .main-btn { width: 100%; font-size: 16px; margin-bottom: 15px; padding: 15px; }
-        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; }
-        .controls { display: flex; align-items: center; gap: 5px; }
-        .btn-sm { width: 30px; height: 30px; padding: 0; font-size: 20px; }
-        .val { width: 50px; text-align: center; font-family: monospace; color: #00d1b2; }
+        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 15px; width: 280px; }
+        .btn-main { width: 100%; padding: 20px; font-size: 18px; background: #00d1b2; border: none; border-radius: 10px; color: black; font-weight: bold; margin-bottom: 20px; cursor: pointer; }
+        .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 8px; }
+        .controls { display: flex; align-items: center; gap: 10px; }
+        .btn-sm { width: 40px; height: 40px; font-size: 24px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-sm:active { background: #666; }
+        .val { min-width: 60px; font-family: monospace; font-size: 16px; color: #00d1b2; }
+        label { font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h3>Mesa ONCE XR</h3>
-    <button id="btnMover" class="main-btn">SUBIR / BAJAR</button>
+    <h3>Control de Mesa XR</h3>
+    
+    <button id="btnMover" class="btn-main">SUBIR / BAJAR</button>
     
     <div class="row">
-        <span>Offset X</span>
+        <label>Offset X</label>
         <div class="controls">
-            <button onclick="adj('offX', -0.01)" class="btn-sm">-</button>
-            <div id="offX" class="val">0.00</div>
-            <button onclick="adj('offX', 0.01)" class="btn-sm">+</button>
+            <button onclick="changeOff('x', -0.01)" class="btn-sm">-</button>
+            <span id="txtX" class="val">0.00</span>
+            <button onclick="changeOff('x', 0.01)" class="btn-sm">+</button>
         </div>
     </div>
+
     <div class="row">
-        <span>Offset Y</span>
+        <label>Offset Y</label>
         <div class="controls">
-            <button onclick="adj('offY', -0.01)" class="btn-sm">-</button>
-            <div id="offY" class="val">0.00</div>
-            <button onclick="adj('offY', 0.01)" class="btn-sm">+</button>
+            <button onclick="changeOff('y', -0.01)" class="btn-sm">-</button>
+            <span id="txtY" class="val">0.00</span>
+            <button onclick="changeOff('y', 0.01)" class="btn-sm">+</button>
         </div>
     </div>
+
     <div class="row">
-        <span>Offset Z</span>
+        <label>Offset Z</label>
         <div class="controls">
-            <button onclick="adj('offZ', -0.01)" class="btn-sm">-</button>
-            <div id="offZ" class="val">0.00</div>
-            <button onclick="adj('offZ', 0.01)" class="btn-sm">+</button>
+            <button onclick="changeOff('z', -0.01)" class="btn-sm">-</button>
+            <span id="txtZ" class="val">0.00</span>
+            <button onclick="changeOff('z', 0.01)" class="btn-sm">+</button>
         </div>
     </div>
 
     <script>
-        let base = null, tablero = null, subiendo = false, alturaY = 0;
-        let ox = 0, oy = 0, oz = 0;
-        const DIST_MAX = 0.5, VEL = 0.3;
+        let base = null, tablero = null;
+        let subiendo = false;
+        let alturaAnim = 0;
+        let offX = 0, offY = 0, offZ = 0;
 
-        // Función para ajustar valores desde los botones
-        function adj(axis, val) {
-            if (axis === 'offX') ox += val;
-            if (axis === 'offY') oy += val;
-            if (axis === 'offZ') oz += val;
-            document.getElementById(axis).innerText = (axis === 'offX' ? ox : axis === 'offY' ? oy : oz).toFixed(2);
-        }
+        const DIST_MAX = 0.5;
+        const VEL = 0.3;
+
+        // Función para los botones +/-
+        window.changeOff = function(axis, amount) {
+            if(axis === 'x') offX += amount;
+            if(axis === 'y') offY += amount;
+            if(axis === 'z') offZ += amount;
+            document.getElementById('txtX').innerText = offX.toFixed(2);
+            document.getElementById('txtY').innerText = offY.toFixed(2);
+            document.getElementById('txtZ').innerText = offZ.toFixed(2);
+        };
 
         document.addEventListener("FigminReady", () => {
+            // Cargar Base
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: figmin.getWindowSpawnPosition()
             });
 
+            // Cargar Tablero
             tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
-                position: figmin.getWindowSpawnPosition(),
-                active: false // Empezamos ocultos hasta sincronizar
+                position: figmin.getWindowSpawnPosition()
             });
 
-            document.getElementById("btnMover").onclick = () => { subiendo = !subiendo; };
+            document.getElementById("btnMover").onclick = () => {
+                subiendo = !subiendo;
+            };
+
             figmin.setUpdateFunction(update);
         });
 
         function update(dt) {
             if (!base || !base.transform || !tablero || !tablero.transform) return;
 
-            // Hacer visible el tablero solo cuando la base esté lista
-            if (!tablero.active) tablero.active = true;
-
-            // 1. Animación altura
-            if (subiendo && alturaY < DIST_MAX) alturaY += VEL * dt;
-            else if (!subiendo && alturaY > 0) alturaY -= VEL * dt;
-
-            const b = base.transform;
-            const t = tablero.transform;
-
-            // 2. Sincronizar ESCALA (Solo si cambia significativamente)
-            if (Math.abs(t.scale.x - b.scale.x) > 0.001) {
-                t.scale = { x: b.scale.x, y: b.scale.y, z: b.scale.z };
+            // 1. Animación suave
+            if (subiendo && alturaAnim < DIST_MAX) {
+                alturaAnim += VEL * dt;
+            } else if (!subiendo && alturaAnim > 0) {
+                alturaAnim -= VEL * dt;
             }
 
-            // 3. Sincronizar ROTACIÓN
-            t.rotation = { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z };
+            // 2. Referencia de la base
+            const bPos = base.transform.position;
+            const bRot = base.transform.rotation;
+            const bScale = base.transform.scale;
 
-            // 4. POSICIÓN LOCAL (Cálculo vectorial para respetar inclinación)
-            const radX = b.rotation.x * Math.PI / 180;
-            const radY = b.rotation.y * Math.PI / 180;
-            const radZ = b.rotation.z * Math.PI / 180;
+            // 3. Sincronizar Escala (Forzado total)
+            tablero.transform.scale = { x: bScale.x, y: bScale.y, z: bScale.z };
+            
+            // 4. Sincronizar Rotación
+            tablero.transform.rotation = { x: bRot.x, y: bRot.y, z: bRot.z };
 
-            // Vector Up de la mesa
-            const upX = Math.sin(radZ) * Math.cos(radX);
-            const upY = Math.cos(radZ) * Math.cos(radX);
-            const upZ = -Math.sin(radX);
-
-            // Vector Right de la mesa (para Offset X)
-            const rtX = Math.cos(radZ) * Math.cos(radY);
-            const rtY = -Math.sin(radZ) * Math.cos(radY);
-            const rtZ = Math.sin(radY);
-
-            // Aplicamos posición sumando la base + movimiento local (elevación + offsets)
-            const desplY = (alturaY + oy) * b.scale.y;
-            const desplX = ox * b.scale.x;
-            const desplZ = oz * b.scale.z;
-
-            t.position = {
-                x: b.position.x + (upX * desplY) + (rtX * desplX),
-                y: b.position.y + (upY * desplY) + (rtY * desplX),
-                z: b.position.z + (upZ * desplY) + desplZ
+            // 5. Sincronizar Posición (Simplificado para evitar errores de eje)
+            // Sumamos la altura animada + el offset manual, todo multiplicado por la escala
+            tablero.transform.position = {
+                x: bPos.x + (offX * bScale.x),
+                y: bPos.y + ((alturaAnim + offY) * bScale.y),
+                z: bPos.z + (offZ * bScale.z)
             };
         }
     </script>
