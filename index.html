@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <meta name="figmin">
@@ -22,6 +22,7 @@
     <script>
         let base = null, tablero = null, subiendo = false, alturaY = 0;
         let ox = 0, oy = 0, oz = 0;
+        let baseReady = false, tableroReady = false;   // ← FIX: esperar a onStart
         const DIST_MAX = 0.5, VEL = 0.3;
 
         document.addEventListener("FigminReady", () => {
@@ -41,9 +42,15 @@
                 scale: escalaInicial // <--- ESCALA 1:1 FORZADA
             });
 
-            // Desactivar física para evitar que se caigan o se bloqueen
-            tablero.onStart(() => { if(tablero.physics) tablero.physics.enabled = false; });
-            base.onStart(() => { if(base.physics) base.physics.enabled = false; });
+            // Desactivar física y marcar objetos como listos
+            tablero.onStart(() => {
+                if (tablero.physics) tablero.physics.enabled = false;
+                tableroReady = true;   // ← FIX: tablero listo
+            });
+            base.onStart(() => {
+                if (base.physics) base.physics.enabled = false;
+                baseReady = true;     // ← FIX: base lista
+            });
 
             // ASIGNACIÓN DE BOTONES
             document.getElementById("btnMover").onclick = () => { subiendo = !subiendo; };
@@ -64,11 +71,12 @@
         }
 
         function update(dt) {
-            if (!base || !base.transform || !tablero || !tablero.transform) return;
+            // ← FIX: esperar a que AMBOS objetos hayan disparado onStart
+            if (!baseReady || !tableroReady) return;
 
-            // 1. Animación de altura
-            if (subiendo && alturaY < DIST_MAX) { alturaY += VEL * dt; }
-            else if (!subiendo && alturaY > 0) { alturaY -= VEL * dt; }
+            // 1. Animación de altura (con clamp para no pasarse del límite)
+            if (subiendo && alturaY < DIST_MAX) { alturaY = Math.min(alturaY + VEL * dt, DIST_MAX); }
+            else if (!subiendo && alturaY > 0)  { alturaY = Math.max(alturaY - VEL * dt, 0); }
 
             const b = base.transform;
             const t = tablero.transform;
@@ -78,7 +86,7 @@
             t.scale = { x: b.scale.x, y: b.scale.y, z: b.scale.z };
             t.rotation = { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z };
 
-            // 3. POSICIÓN FINAL
+            // 3. POSICIONFINAL
             // El tablero sigue a la base y aplica el movimiento local
             t.position = {
                 x: b.position.x + (ox * b.scale.x),
@@ -88,4 +96,5 @@
         }
     </script>
 </body>
-</html>
+  </html>
+
