@@ -11,7 +11,7 @@
 <body>
     <h3>Mesa ONCE XR</h3>
     <button id="btnMover">SUBIR / BAJAR</button>
-    <div id="status">Esperando a Figmin XR...</div>
+    <div id="status">Buscando Figmin...</div>
 
     <script>
         let base = null;
@@ -23,9 +23,8 @@
         const VELOCIDAD = 0.3;
         const statusText = document.getElementById("status");
 
-        // Esta es la función que hace que Figmin empiece a trabajar
         document.addEventListener("FigminReady", function() {
-            statusText.innerText = "Figmin detectado. Cargando...";
+            statusText.innerText = "Cargando Base...";
 
             // 1. Crear Base
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
@@ -33,42 +32,49 @@
                 position: figmin.getWindowSpawnPosition()
             });
 
-            // 2. Cuando la base cargue, crear tablero
+            // 2. Esperar a que la base esté lista
             base.onStart(function() {
                 statusText.innerText = "Base lista. Cargando tablero...";
                 
+                // 3. Crear tablero como objeto independiente primero
                 tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                     url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
-                    parent: base,
-                    position: { x: 0, y: 0, z: 0 },
-                    rotation: { x: 0, y: 0, z: 0 }
+                    position: { x: 0, y: 0, z: 0 } 
                 });
 
+                // 4. Cuando el tablero cargue, lo emparentamos a la fuerza
                 tablero.onStart(function() {
-                    statusText.innerText = "¡Mesa lista!";
+                    statusText.innerText = "Emparejando piezas...";
+                    
+                    // FORZAMOS LA JERARQUÍA AQUÍ
+                    tablero.parent = base;
+                    
+                    // Reseteamos posición relativa para que encajen
+                    tablero.transform.position = { x: 0, y: 0, z: 0 };
+                    tablero.transform.rotation = { x: 0, y: 0, z: 0 };
+                    
+                    statusText.innerText = "¡Mesa lista y vinculada!";
                 });
             });
 
-            // Configurar botón
             document.getElementById("btnMover").onclick = function() {
                 subiendo = !subiendo;
                 statusText.innerText = subiendo ? "Subiendo..." : "Bajando...";
             };
 
-            // Iniciar bucle de movimiento
             figmin.setUpdateFunction(update);
         });
 
         function update(dt) {
-            // Solo movemos si el tablero está listo
-            if (tablero && tablero.transform) {
+            // Solo movemos si el tablero tiene padre y transform listo
+            if (tablero && tablero.parent && tablero.transform) {
                 if (subiendo && alturaY < DISTANCIA_MAX) {
                     alturaY += VELOCIDAD * dt;
                 } else if (!subiendo && alturaY > 0) {
                     alturaY -= VELOCIDAD * dt;
                 }
                 
-                // Aplicar altura
+                // Mueve el tablero respecto a la base
                 tablero.transform.position = { x: 0, y: alturaY, z: 0 };
             }
         }
