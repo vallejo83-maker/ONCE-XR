@@ -1,55 +1,124 @@
 ﻿<!DOCTYPE html>
 <html>
+
 <head>
     <meta name="figmin">
     <style>
-        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 15px; width: 260px; border: 2px solid #00d1b2; }
-        .btn-main { width: 100%; padding: 15px; font-size: 16px; background: #00d1b2; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; color: black; }
-        .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        .controls { display: flex; align-items: center; gap: 8px; }
-        .btn-sm { width: 35px; height: 35px; font-size: 20px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .val { min-width: 50px; font-family: monospace; color: #00d1b2; font-size: 14px; font-weight: bold; }
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            color: white;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 15px;
+            width: 260px;
+            border: 2px solid #00d1b2;
+        }
+
+        .btn-main {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            background: #00d1b2;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            cursor: pointer;
+            color: black;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            width: 35px;
+            height: 35px;
+            font-size: 20px;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .val {
+            min-width: 50px;
+            font-family: monospace;
+            color: #00d1b2;
+            font-size: 14px;
+            font-weight: bold;
+        }
     </style>
 </head>
+
 <body>
     <h3 style="margin-top:0">Panel Mesa ONCE</h3>
     <button id="btnMover" class="btn-main">SUBIR / BAJAR</button>
-    
-    <div class="row"><span>X</span><div class="controls"><button id="mx">-</button><span id="tx">0.00</span><button id="px">+</button></div></div>
-    <div class="row"><span>Y</span><div class="controls"><button id="my">-</button><span id="ty">0.00</span><button id="py">+</button></div></div>
-    <div class="row"><span>Z</span><div class="controls"><button id="mz">-</button><span id="tz">0.00</span><button id="pz">+</button></div></div>
+
+    <div class="row"><span>X</span>
+        <div class="controls"><button id="mx">-</button><span id="tx">0.00</span><button id="px">+</button></div>
+    </div>
+    <div class="row"><span>Y</span>
+        <div class="controls"><button id="my">-</button><span id="ty">0.00</span><button id="py">+</button></div>
+    </div>
+    <div class="row"><span>Z</span>
+        <div class="controls"><button id="mz">-</button><span id="tz">0.00</span><button id="pz">+</button></div>
+    </div>
 
     <script>
         let base = null, tablero = null, subiendo = false, alturaY = 0;
         let ox = 0, oy = 0, oz = 0;
-        let baseReady = false, tableroReady = false;   // ← FIX: esperar a onStart
+        let baseReady = false, tableroReady = false;
+        // anchorPos: posición real de la base capturada en onStart (no en FigminReady)
+        // getWindowSpawnPosition() puede devolver {0,0,0} antes de que la ventana esté lista
+        let anchorPos = null;
         const DIST_MAX = 0.5, VEL = 0.3;
 
         document.addEventListener("FigminReady", () => {
-            // FORZAMOS ESCALA 1 AL IMPORTAR
             const escalaInicial = { x: 1, y: 1, z: 1 };
             const spawnPos = figmin.getWindowSpawnPosition();
 
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: spawnPos,
-                scale: escalaInicial // <--- ESCALA 1:1 FORZADA
+                scale: escalaInicial
             });
 
             tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
                 position: spawnPos,
-                scale: escalaInicial // <--- ESCALA 1:1 FORZADA
+                scale: escalaInicial
             });
 
-            // Desactivar física y marcar objetos como listos
-            tablero.onStart(() => {
-                if (tablero.physics) tablero.physics.enabled = false;
-                tableroReady = true;   // ← FIX: tablero listo
-            });
+            // onStart: capturamos la posición REAL de la base una vez que está colocada en el mundo
             base.onStart(() => {
                 if (base.physics) base.physics.enabled = false;
-                baseReady = true;     // ← FIX: base lista
+                // Guardamos la posición real del objeto tras su colocación en la escena
+                anchorPos = {
+                    x: base.transform.position.x,
+                    y: base.transform.position.y,
+                    z: base.transform.position.z
+                };
+                figmin.print("Base lista en: " + JSON.stringify(anchorPos));
+                baseReady = true;
+            });
+
+            tablero.onStart(() => {
+                if (tablero.physics) tablero.physics.enabled = false;
+                tableroReady = true;
             });
 
             // ASIGNACIÓN DE BOTONES
@@ -71,30 +140,29 @@
         }
 
         function update(dt) {
-            // ← FIX: esperar a que AMBOS objetos hayan disparado onStart
-            if (!baseReady || !tableroReady) return;
+            // Esperar a que ambos objetos estén listos Y que anchorPos esté capturado
+            if (!baseReady || !tableroReady || !anchorPos) return;
 
-            // 1. Animación de altura (con clamp para no pasarse del límite)
+            // 1. Animación de altura (con clamp)
             if (subiendo && alturaY < DIST_MAX) { alturaY = Math.min(alturaY + VEL * dt, DIST_MAX); }
-            else if (!subiendo && alturaY > 0)  { alturaY = Math.max(alturaY - VEL * dt, 0); }
+            else if (!subiendo && alturaY > 0) { alturaY = Math.max(alturaY - VEL * dt, 0); }
 
-            const b = base.transform;
-            const t = tablero.transform;
+            // 2. Leer escala y rotación en vivo de la base (para seguir cambios del usuario)
+            const sc = base.transform.scale;
+            const rot = base.transform.rotation;
 
-            // 2. SINCRONIZACIÓN DE TRANSFORMACIONES
-            // El tablero copia escala y rotación de la base en cada frame
-            t.scale = { x: b.scale.x, y: b.scale.y, z: b.scale.z };
-            t.rotation = { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z };
+            // 3. Sincronizar escala y rotación del tablero con la base
+            tablero.transform.scale = { x: sc.x, y: sc.y, z: sc.z };
+            tablero.transform.rotation = { x: rot.x, y: rot.y, z: rot.z };
 
-            // 3. POSICIONFINAL
-            // El tablero sigue a la base y aplica el movimiento local
-            t.position = {
-                x: b.position.x + (ox * b.scale.x),
-                y: b.position.y + ((alturaY + oy) * b.scale.y),
-                z: b.position.z + (oz * b.scale.z)
+            // 4. Posición: anchorPos (fijo, capturado en onStart) + offsets escalados
+            tablero.transform.position = {
+                x: anchorPos.x + (ox * sc.x),
+                y: anchorPos.y + ((alturaY + oy) * sc.y),
+                z: anchorPos.z + (oz * sc.z)
             };
         }
     </script>
 </body>
-  </html>
 
+</html>
