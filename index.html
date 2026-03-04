@@ -76,20 +76,21 @@
             figmin.setUpdateFunction(update);
         }
 
-        function update(dt) {
-            if (!tablero) return;
+       function update(dt) {
+    if (!tablero) return;
 
-            // Lógica de movimiento
-            if (subiendo && alturaY < DISTANCIA_MAX) {
-                alturaY += VELOCIDAD * dt;
-            } else if (!subiendo && alturaY > 0) {
-                alturaY -= VELOCIDAD * dt;
-            }
+    // Lógica de movimiento
+    if (subiendo && alturaY < DISTANCIA_MAX) {
+        alturaY += VELOCIDAD * dt;
+    } else if (!subiendo && alturaY > 0) {
+        alturaY -= VELOCIDAD * dt;
+    }
 
-            // Aplicamos la posición relativa
-            // Es VITAL asignar el objeto completo transform.position
-            tablero.transform.position = { x: 0, y: alturaY, z: 0 };
-        }
+    // APLICAR POSICIÓN DE FORMA SEGURA
+    let pos = tablero.transform.position; // Obtenemos la posición actual
+    pos.y = alturaY;                      // Solo cambiamos la altura
+    tablero.transform.position = pos;     // Reasignamos el objeto completo
+}
     </script>
 </body>
 </html>
