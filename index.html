@@ -3,80 +3,89 @@
 <head>
     <meta name="figmin">
     <style>
-        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 12px; width: 220px; }
-        button { padding: 12px; font-size: 15px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 8px; width: 100%; font-weight: bold; }
-        #info { margin-top: 10px; font-size: 10px; color: #00d1b2; }
+        body { font-family: sans-serif; text-align: center; color: white; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 12px; width: 240px; }
+        button { padding: 12px; font-size: 15px; cursor: pointer; background: #00d1b2; color: white; border: none; border-radius: 8px; width: 100%; font-weight: bold; margin-bottom: 10px; }
+        .controls { display: grid; grid-template-columns: 1fr 2fr; gap: 5px; align-items: center; font-size: 12px; text-align: left; }
+        input { background: #333; color: #00d1b2; border: 1px solid #00d1b2; border-radius: 4px; padding: 4px; width: 80%; text-align: center; }
+        #status { margin-top: 10px; font-size: 10px; color: #aaa; }
+        label { font-weight: bold; }
     </style>
 </head>
 <body>
     <h3>Mesa ONCE XR</h3>
     <button id="btnMover">SUBIR / BAJAR</button>
-    <div id="info">Sincronizando modelos...</div>
+    
+    <div class="controls">
+        <label>Offset X:</label><input type="number" id="offX" value="0" step="0.01">
+        <label>Offset Y:</label><input type="number" id="offY" value="0" step="0.01">
+        <label>Offset Z:</label><input type="number" id="offZ" value="0" step="0.01">
+    </div>
+
+    <div id="status">Sincronización Local Activa</div>
 
     <script>
-        let base = null;
-        let tablero = null;
-        let subiendo = false;
-        let alturaY = 0; 
+        let base = null, tablero = null, subiendo = false, alturaY = 0; 
+        const DISTANCIA_MAX = 0.5, VELOCIDAD = 0.3;
 
-        // --- AJUSTES MANUALES ---
-        const DISTANCIA_MAX = 0.5; // Metros que sube
-        const VELOCIDAD = 0.3;     // Velocidad de subida
-        const OFFSET_INICIAL_Y = 0; // Cambia esto (ej: 0.1 o -0.1) si el tablero no encaja al inicio
-        // ------------------------
+        const toRad = (deg) => deg * (Math.PI / 180);
 
         document.addEventListener("FigminReady", function() {
-            // 1. Crear Base
+            // Cargar Base
             base = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/base.glb",
                 position: figmin.getWindowSpawnPosition()
             });
 
-            // 2. Crear Tablero
+            // Cargar Tablero
             tablero = figmin.createObject(figmin.ObjectType.MODEL3D, {
                 url: "https://vallejo83-maker.github.io/ONCE-XR/tablero.glb",
                 position: figmin.getWindowSpawnPosition()
             });
 
-            document.getElementById("btnMover").onclick = function() {
-                subiendo = !subiendo;
-            };
-
+            document.getElementById("btnMover").onclick = () => { subiendo = !subiendo; };
+            
             figmin.setUpdateFunction(update);
         });
 
         function update(dt) {
-            // Comprobamos que ambos objetos tengan sus datos listos
             if (base && base.transform && tablero && tablero.transform) {
                 
-                document.getElementById("info").innerText = "Sincronización 1:1 Activa";
+                // 1. Animación de la altura (Subida/Bajada)
+                if (subiendo && alturaY < DISTANCIA_MAX) { alturaY += VELOCIDAD * dt; }
+                else if (!subiendo && alturaY > 0) { alturaY -= VELOCIDAD * dt; }
 
-                // 1. Calcular altura de la animación
-                if (subiendo && alturaY < DISTANCIA_MAX) {
-                    alturaY += VELOCIDAD * dt;
-                } else if (!subiendo && alturaY > 0) {
-                    alturaY -= VELOCIDAD * dt;
-                }
+                // 2. Leer Offsets de los Inputs en tiempo real
+                const ox = parseFloat(document.getElementById("offX").value) || 0;
+                const oy = parseFloat(document.getElementById("offY").value) || 0;
+                const oz = parseFloat(document.getElementById("offZ").value) || 0;
 
-                // 2. LEER DATOS DE LA BASE (El objeto maestro)
                 const bPos = base.transform.position;
                 const bRot = base.transform.rotation;
                 const bScale = base.transform.scale;
 
-                // 3. FORZAR TABLERO A SEGUIR A LA BASE
-                // Sincronizamos ESCALA (si agrandas la base, el tablero crece igual)
+                // 3. Sincronizar Escala y Rotación
                 tablero.transform.scale = { x: bScale.x, y: bScale.y, z: bScale.z };
-
-                // Sincronizamos ROTACIÓN (si giras la base, el tablero gira igual)
                 tablero.transform.rotation = { x: bRot.x, y: bRot.y, z: bRot.z };
 
-                // Sincronizamos POSICIÓN
-                // Aplicamos la altura sumada a la posición de la base, 
-                // multiplicada por la escala para que no se desplace mal.
+                // 4. Cálculo de Movimiento en Eje Local (Orientación)
+                const rx = toRad(bRot.x), ry = toRad(bRot.y), rz = toRad(bRot.z);
+
+                // Vector "Arriba" de la mesa (Y local)
+                const upX = Math.sin(rz) * Math.cos(rx);
+                const upY = Math.cos(rz) * Math.cos(rx);
+                const upZ = -Math.sin(rx);
+
+                // Aplicamos el desplazamiento (Altura animada + Offset Y manual) * Escala
+                const desplY = (alturaY + oy) * bScale.y;
+                const desplX = ox * bScale.x;
+                const desplZ = oz * bScale.z;
+
+                // Posición final: Base + desplazamiento en los 3 ejes corregidos por rotación
+                // Nota: Simplificado para que el Offset Y siga siempre el eje "arriba" de la mesa
                 tablero.transform.position = { 
-                    x: bPos.x, 
-                    y: bPos.y + ((alturaY + OFFSET_INICIAL_Y) * bScale.y), 
-                    z: bPos.z 
+                    x: bPos.x + (upX * desplY) + desplX, 
+                    y: bPos.y + (upY * desplY), 
+                    z: bPos.z + (upZ * desplY) + desplZ
                 };
             }
         }
